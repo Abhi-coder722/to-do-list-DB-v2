@@ -4,7 +4,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 
 const mongoose = require("mongoose");
-
+const _ = require("lodash");
 const app = express();
 
 app.set('view engine', 'ejs');
@@ -45,20 +45,40 @@ const workItems = [];
 app.post("/", function(req, res){
 
   var itemName = req.body.newItem;
+  const listName = req.body.list;
 
   const item= new Item({
     name:itemName
   });
-  item.save();
-  res.redirect("/");
+
+  if(listName=="Today"){
+    item.save();
+    res.redirect("/");
+  }
+  else{
+    List.findOne({name:listName}).then((foundList)=>{
+      foundList.items.push(item);
+      foundList.save();
+      res.redirect(("/"+listName));
+    });
+  }
 });
 
 app.post("/delete",function(req,res){
 const checkedItemId= req.body.checkbox;
-Item.findByIdAndRemove(checkedItemId).then ((removeditem)=>{
-  console.log("removed successfully");
-});
-res.redirect("/");
+const listName=req.body.listName;
+
+
+if(listName=="Today"){
+  Item.findByIdAndRemove(checkedItemId).then ((removeditem)=>{
+    console.log("removed successfully");
+    res.redirect("/");
+  });
+}else{
+     List.findOneAndUpdate({name:listName},{$pull: {items:{_id:checkedItemId}}}).then((foundList)=>{
+      res.redirect("/"+listName);
+     })
+}
 });
 
 
@@ -80,7 +100,7 @@ app.get("/", function(req,res){
 
 
 app.get("/:customListName",function(req,res){
-  const customListName=req.params.customListName;
+  const customListName=_.capitalize(req.params.customListName);
   List.findOne({name:customListName}).then(function(foundList){
     if(!foundList){
       const list = new List({
